@@ -36,6 +36,66 @@ let cache: OjkCache | null = null;
 const CACHE_TTL_MS = 1000 * 60 * 30;
 const OJK_SOURCE = "OJK Invest API";
 const LOCAL_API_SOURCE = "DAFTAR API LOKAL INDONESIA";
+const FALLBACK_OJK_DATA: Pick<OjkCache, "illegals" | "apps" | "products"> = {
+  illegals: [
+    {
+      name: "PT Saham Bibit Reksadana, PT Bibit Saham Reksadana, dan PT Bibit Tumbuh Bersama Reksadana",
+      entity_type: "Investasi Ilegal",
+      activity_type: ["Lain - Lain"],
+      input_date: "01/06/2022",
+      description:
+        "SP 03/SWI/V/2021 Penawaran investasi tanpa izin dengan menduplikasi nama PT Bibit Tumbuh Bersama (Bibit.id)",
+    },
+  ],
+  apps: [
+    {
+      name: "Blibli",
+      url: "https://www.blibli.com",
+      owner: "PT Global Digital Niaga - PT Bibit Tumbuh Bersama",
+    },
+    {
+      name: "Bibitnomic",
+      url: "http://bibit.id",
+      owner: "PT Bibit Tumbuh Bersama",
+    },
+    {
+      name: "LinkAja",
+      url: "https://www.linkaja.id/promo/linkaja-investasi-di-menu-investasi-reksadana-aplikasi-linkaja-dapat-cashback-s-d-10rb",
+      owner: "PT Fintek Karya Nusantara - PT Bibit Tumbuh Bersama",
+    },
+    {
+      name: "Shopee",
+      url: "https://shopee.co.id/m/reksa-dana-di-shopee",
+      owner: "PT Shopee International Indonesia - PT Bibit Tumbuh Bersama",
+    },
+    {
+      name: "Ajaib",
+      url: "https://www.ajaib.co.id",
+      owner: "PT Takjub Teknologi Indonesia",
+    },
+    {
+      name: "Ajaib Sekuritas",
+      url: "https://play.google.com/store/apps/details?id=ajaib.co.id",
+      owner: "PT Ajaib Sekuritas Asia - PT Takjub Teknologi Indonesia",
+    },
+    {
+      name: "Pluang",
+      url: "https://www.pluang.com",
+      owner: "PT Bumi Santosa Cemerlang - PT Sarana Santosa Sejati",
+    },
+    {
+      name: "Pluang-Grow",
+      url: "https://www.pluanggrow.com/",
+      owner: "PT Sarana Santosa Sejati",
+    },
+    {
+      name: "Bareksa.com",
+      url: "https://www.bareksa.com",
+      owner: "PT Bareksa Portal Investasi",
+    },
+  ],
+  products: [],
+};
 const LOCAL_FINANCIAL_APIS: OjkRecord[] = [
   {
     name: "OJK Investasi API",
@@ -109,7 +169,9 @@ function getName(record: OjkRecord) {
 }
 
 function getDetail(record: OjkRecord) {
-  return String(record.type || record.category || record.management || record.description || "");
+  return String(
+    record.description || record.type || record.category || record.management || ""
+  );
 }
 
 function getOwner(record: OjkRecord) {
@@ -298,7 +360,9 @@ function buildWhy(query: string, level: RiskLevel, matches: RiskMatch[], sourceS
   const sourceNote =
     sourceStatus === "live"
       ? "Penilaian juga mempertimbangkan data OJK Invest API."
-      : "Penilaian memakai heuristik lokal dan rujukan katalog API lokal karena data OJK live belum dapat diakses saat ini.";
+      : matches.some((match) => match.source.startsWith("OJK"))
+        ? "Penilaian memakai salinan cadangan data OJK karena data OJK live belum dapat diakses saat ini."
+        : "Penilaian memakai heuristik lokal dan rujukan katalog API lokal karena data OJK live belum dapat diakses saat ini.";
 
   if (level === "Bahaya") {
     return `${name} perlu dihindari sampai legalitasnya jelas. Jika sebuah penawaran masuk daftar ilegal atau memiliki ciri imbal hasil tidak wajar, risiko kehilangan dana jauh lebih besar daripada potensi keuntungannya. ${sourceNote}`;
@@ -312,11 +376,12 @@ function buildWhy(query: string, level: RiskLevel, matches: RiskMatch[], sourceS
   return `${legalMatch}${name} terlihat lebih terkendali dari sisi legalitas, tetapi tetap bukan berarti bebas risiko. Sesuaikan dengan tujuan, horizon waktu, dan profil risiko pribadi. ${sourceNote}`;
 }
 
-export async function assessInvestmentRisk(query: string): Promise<RiskAssessment> {
-  const checkedAt = new Date().toISOString();
-
-  try {
-    const data = await getOjkData();
+function assessFromOjkData(
+  query: string,
+  data: Pick<OjkCache, "illegals" | "apps" | "products">,
+  checkedAt: string,
+  sourceStatus: "live" | "fallback"
+): RiskAssessment {
     const illegalMatches = findMatches(data.illegals, query, "OJK Illegal");
     const appMatches = findMatches(data.apps, query, "OJK Aplikasi Legal");
     const productMatches = findMatches(data.products, query, "OJK Produk Legal");
@@ -336,10 +401,10 @@ export async function assessInvestmentRisk(query: string): Promise<RiskAssessmen
         score: 74,
         reason:
           "Ditemukan entri ilegal yang menduplikasi nama atau kanal serupa, tetapi juga ada kecocokan dengan data legal. Pastikan Anda hanya memakai aplikasi, situs, dan rekening resmi.",
-        why: buildWhy(query, "Peringatan", matches, "live"),
+        why: buildWhy(query, "Peringatan", matches, sourceStatus),
         matches,
         dataSource: OJK_SOURCE,
-        sourceStatus: "live",
+        sourceStatus,
         checkedAt,
       };
     }
@@ -355,10 +420,10 @@ export async function assessInvestmentRisk(query: string): Promise<RiskAssessmen
       return {
         query,
         ...result,
-        why: buildWhy(query, result.level, matches, "live"),
+        why: buildWhy(query, result.level, matches, sourceStatus),
         matches,
         dataSource: OJK_SOURCE,
-        sourceStatus: "live",
+        sourceStatus,
         checkedAt,
       };
     }
@@ -375,10 +440,10 @@ export async function assessInvestmentRisk(query: string): Promise<RiskAssessmen
           level === "Aman"
             ? "Ditemukan kecocokan dengan produk atau pengelola yang terdata. Risiko tetap perlu dilihat dari jenis produk, biaya, dan tujuan investasi."
             : "Ditemukan kecocokan dengan produk legal, tetapi jenis produknya tetap memiliki risiko pasar yang perlu dipahami.",
-        why: buildWhy(query, level, matches, "live"),
+        why: buildWhy(query, level, matches, sourceStatus),
         matches,
         dataSource: OJK_SOURCE,
-        sourceStatus: "live",
+        sourceStatus,
         checkedAt,
       };
     }
@@ -390,10 +455,10 @@ export async function assessInvestmentRisk(query: string): Promise<RiskAssessmen
         score: 32,
         reason:
           "Ditemukan kecocokan dengan aplikasi atau kanal investasi yang terdata. Tetap pastikan alamat situs/aplikasi benar dan transaksi dilakukan melalui kanal resmi.",
-        why: buildWhy(query, "Aman", matches, "live"),
+        why: buildWhy(query, "Aman", matches, sourceStatus),
         matches,
         dataSource: OJK_SOURCE,
-        sourceStatus: "live",
+        sourceStatus,
         checkedAt,
       };
     }
@@ -403,13 +468,27 @@ export async function assessInvestmentRisk(query: string): Promise<RiskAssessmen
     return {
       query,
       ...heuristic,
-      why: buildWhy(query, heuristic.level, matches, "live"),
+      why: buildWhy(query, heuristic.level, matches, sourceStatus),
       matches,
       dataSource: OJK_SOURCE,
-      sourceStatus: "live",
+      sourceStatus,
       checkedAt,
     };
+}
+
+export async function assessInvestmentRisk(query: string): Promise<RiskAssessment> {
+  const checkedAt = new Date().toISOString();
+
+  try {
+    const data = await getOjkData();
+    return assessFromOjkData(query, data, checkedAt, "live");
   } catch {
+    const fallbackAssessment = assessFromOjkData(query, FALLBACK_OJK_DATA, checkedAt, "fallback");
+
+    if (fallbackAssessment.matches.length > 0) {
+      return fallbackAssessment;
+    }
+
     const heuristic = heuristicScore(query);
     const localReferences = getLocalApiReferences(query);
 
