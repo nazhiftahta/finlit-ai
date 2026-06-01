@@ -1,12 +1,11 @@
 {
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/trpc/:path*",
-      "destination": "/api/trpc/:path*"
+      "handle": "filesystem"
     },
     {
-      "source": "/:path*",
-      "destination": "/index.html"
+      "src": "/.*",
+      "dest": "/index.html"
     }
   ]
 }
