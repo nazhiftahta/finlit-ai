@@ -3,7 +3,7 @@ import { ENV } from "./env";
 export type RiskLevel = "Aman" | "Peringatan" | "Bahaya";
 
 export type RiskMatch = {
-  source: "OJK Illegal" | "OJK Aplikasi Legal" | "OJK Produk Legal";
+  source: "OJK Illegal" | "OJK Aplikasi Legal" | "OJK Produk Legal" | "API Lokal Indonesia";
   name: string;
   owner?: string;
   detail?: string;
@@ -35,6 +35,53 @@ let cache: OjkCache | null = null;
 
 const CACHE_TTL_MS = 1000 * 60 * 30;
 const OJK_SOURCE = "OJK Invest API";
+const LOCAL_API_SOURCE = "DAFTAR API LOKAL INDONESIA";
+const LOCAL_FINANCIAL_APIS: OjkRecord[] = [
+  {
+    name: "OJK Investasi API",
+    owner: "Cristopher",
+    detail:
+      "API yang menampilkan daftar investasi legal dan ilegal di Indonesia, bersumber dari data Otoritas Jasa Keuangan.",
+    url: "https://github.com/Namchee/ojk-invest-api",
+    keywords: "ojk investasi legal ilegal bibit bareksa ajaib pluang stockbit reksadana saham platform aplikasi",
+  },
+  {
+    name: "API Data Saham Indonesia",
+    owner: "goapi-id",
+    detail:
+      "REST API data saham Indonesia untuk data perusahaan, harga saham, dan informasi pasar.",
+    url: "https://goapi.io/api-data-saham-indonesia",
+    keywords: "saham emiten pasar modal investasi perusahaan harga saham",
+  },
+  {
+    name: "CoinMarketCap",
+    owner: "CoinMarketCap",
+    detail: "API data aset kripto dan kapitalisasi pasar.",
+    url: "https://coinmarketcap.com/api",
+    keywords: "crypto kripto bitcoin ethereum aset digital coin market cap",
+  },
+  {
+    name: "Indodax",
+    owner: "btcid",
+    detail: "Dokumentasi API exchange kripto Indodax.",
+    url: "https://github.com/btcid/indodax-official-api-docs",
+    keywords: "indodax crypto kripto exchange bitcoin trading",
+  },
+  {
+    name: "Trading Economics",
+    owner: "tradingeconomics",
+    detail: "API data ekonomi, kalender ekonomi, dan data historis.",
+    url: "https://tradingeconomics.com/api/",
+    keywords: "ekonomi inflasi suku bunga makro data ekonomi kalender ekonomi",
+  },
+  {
+    name: "Currency Exchange",
+    owner: "azharimm",
+    detail: "API kurs dan nilai tukar mata uang.",
+    url: "https://github.com/azharimm/currency-exchange-api",
+    keywords: "kurs valuta mata uang exchange rate dollar rupiah",
+  },
+];
 
 function normalize(value: string) {
   return value
@@ -171,6 +218,16 @@ function findMatches(records: OjkRecord[], query: string, source: RiskMatch["sou
     }));
 }
 
+function getLocalApiReferences(query: string) {
+  const matches = findMatches(LOCAL_FINANCIAL_APIS, query, "API Lokal Indonesia");
+
+  if (matches.length > 0) {
+    return matches.slice(0, 4);
+  }
+
+  return findMatches(LOCAL_FINANCIAL_APIS, "ojk investasi", "API Lokal Indonesia").slice(0, 3);
+}
+
 function heuristicScore(query: string) {
   const normalizedQuery = normalize(query);
 
@@ -241,7 +298,7 @@ function buildWhy(query: string, level: RiskLevel, matches: RiskMatch[], sourceS
   const sourceNote =
     sourceStatus === "live"
       ? "Penilaian juga mempertimbangkan data OJK Invest API."
-      : "Penilaian memakai heuristik lokal karena data OJK belum dapat diakses saat ini.";
+      : "Penilaian memakai heuristik lokal dan rujukan katalog API lokal karena data OJK live belum dapat diakses saat ini.";
 
   if (level === "Bahaya") {
     return `${name} perlu dihindari sampai legalitasnya jelas. Jika sebuah penawaran masuk daftar ilegal atau memiliki ciri imbal hasil tidak wajar, risiko kehilangan dana jauh lebih besar daripada potensi keuntungannya. ${sourceNote}`;
@@ -354,13 +411,14 @@ export async function assessInvestmentRisk(query: string): Promise<RiskAssessmen
     };
   } catch {
     const heuristic = heuristicScore(query);
+    const localReferences = getLocalApiReferences(query);
 
     return {
       query,
       ...heuristic,
-      why: buildWhy(query, heuristic.level, [], "fallback"),
-      matches: [],
-      dataSource: "Heuristik lokal",
+      why: buildWhy(query, heuristic.level, localReferences, "fallback"),
+      matches: localReferences,
+      dataSource: LOCAL_API_SOURCE,
       sourceStatus: "fallback",
       checkedAt,
     };
