@@ -1,8 +1,10 @@
-# Finlit AI
+# **FinLit AI: Your Financial Learning Assistant**
 
 Finlit AI adalah aplikasi literasi keuangan berbasis web untuk membantu pengguna memahami topik keuangan pribadi, investasi, budgeting, dan mengecek risiko awal suatu platform atau produk investasi.
 
 Project ini berisi frontend React, backend tRPC/Express, integrasi LLM lewat GitHub Models, dan fitur pengecekan risiko investasi berbasis OJK Invest API dengan fallback data lokal.
+
+**Live demo:** https://finlit-ai.vercel.app/
 
 ## Fitur Utama
 
