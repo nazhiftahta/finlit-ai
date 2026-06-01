@@ -1,4 +1,4 @@
-import { createApiApp } from "../dist/index.js";
+import { createApiApp } from "../dist/api.js";
 
 const app = createApiApp({ trpcRootFallback: true });
 
