@@ -69,8 +69,12 @@ export default function Home() {
       {/* Hero Section */}
       <div className="container px-4 py-12">
         <div className="text-center mb-12">
-          <div className="inline-block mb-4 p-3 rounded-full bg-primary/10">
-            <Wallet className="w-8 h-8 text-primary" />
+          <div className="inline-flex mb-4 h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-primary/10">
+            <img
+              src="/logo.png"
+              alt="Finlit AI"
+              className="h-full w-full object-contain"
+            />
           </div>
           <h1 className="text-4xl md:text-5xl font-bold mb-4">
             Kelola Keuangan Anda dengan Cerdas
